@@ -55,17 +55,15 @@ namespace SunlightOS
                 int cnt = 0;
                 foreach(string arg in cmda)
                 {
-                    vr[$"${cnt}"] = arg;
+                    vr[Convert.ToString(cnt)] = arg;
                     cnt += 1;
                 }
-                Console.WriteLine(JsonSerializer.Serialize(vr));
                 foreach (string ln in fs[$"{di}{cmda[0]}.sle"].Split(';')){
                     string line = ln;
                     foreach(string item in vr.Keys)
                     {
                         line = line.Replace($"${item}", vr[item]);
                     }
-                    Console.WriteLine(line);
                     Regex rx = new Regex(@"^[ \n\t+]*write:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
                     if(rx.Matches(line).Count == 1)
                     {
@@ -78,11 +76,22 @@ namespace SunlightOS
                     }
                 }
             }
-            //$"{data["path"][0]}{cmda[0]}.sle"//
             else if (fs.ContainsKey($"{data["path"][0]}{cmda[0]}.sle"))
             {
-                foreach (string line in fs[$"{data["path"][0]}{cmda[0]}.sle"].Split(';'))
+                Dictionary<string, string> vr = new Dictionary<string, string>();
+                int cnt = 0;
+                foreach (string arg in cmda)
                 {
+                    vr[Convert.ToString(cnt)] = arg;
+                    cnt += 1;
+                }
+                foreach (string ln in fs[$"{data["path"][0]}{cmda[0]}.sle"].Split(';'))
+                {
+                    string line = ln;
+                    foreach (string item in vr.Keys)
+                    {
+                        line = line.Replace($"${item}", vr[item]);
+                    }
                     Regex rx = new Regex(@"^[ \n\t+]*write:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
                     if (rx.Matches(line).Count == 1)
                     {
@@ -91,14 +100,14 @@ namespace SunlightOS
                     else
                     {
                         Console.WriteLine($"SunlightError: Invalid SLE command \"{line}\".");
-                        return false;
+                        //return false;//
                     }
                 }
             }
             else
             {
                 Console.WriteLine($"SunlightError: Invalid command \"{cmda[0]}\"");
-                return false;
+                //return false;//
             }
             vars["lcmd"] = command;
             return true;
