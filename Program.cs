@@ -19,6 +19,26 @@ namespace SunlightOS
             var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
             return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
         }
+        public static string absdir(string dir,string di)
+        {
+            if(dir == "//")
+            {
+                return dir;
+            }
+            if (dir.StartsWith("/"))
+            {
+                dir = "/" + dir;
+            }
+            if (!dir.StartsWith("/"))
+            {
+                dir = di + dir;
+            }
+            if (!dir.EndsWith("/"))
+            {
+                dir = dir + "/";
+            }
+            return dir;
+        }
         static void Main(string[] args)
         {
             Console.WriteLine("Booting SunlightOS.");
@@ -27,6 +47,7 @@ namespace SunlightOS
             Dictionary<string, string> vars = new Dictionary<string, string>();
             vars["cdir"] = "//";
             var di = "//";
+            Console.WriteLine("SunlightOS [Version 0.0.1]");
             while (true)
             {
                 var dt = Run(di, vars);
@@ -69,7 +90,31 @@ namespace SunlightOS
             }
             else if(cmda[0] == "cd")
             {
-
+                if (dirs.Contains(absdir(cmda[1],di)))
+                {
+                    di = absdir(cmda[1],di);
+                }
+                else
+                {
+                    Console.WriteLine($"CDError: No such dir: \"{cmda[1]}\".");
+                }
+            }
+            else if(cmda[0] == "mkdir")
+            {
+                if (dirs.Contains(absdir(cmda[1], di)))
+                {
+                    Console.WriteLine("MKDirError: Directory Exists.");
+                }
+                else
+                {
+                    List<string> dl = new List<string>();
+                    foreach (string item in dirs)
+                    {
+                        dl.Add(item);
+                    }
+                    dl.Add(absdir(cmda[1], di));
+                    File.WriteAllText("data/dirs.sl", JsonSerializer.Serialize(dl));
+                }
             }
             else if (fs.ContainsKey($"{di}{cmda[0]}.sle"))
             {
