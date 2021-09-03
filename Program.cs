@@ -19,13 +19,16 @@ namespace SunlightOS
             var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
             return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
         }
-        public static string absdir(string dir,string di)
+        public static string absdir(string dir, string di, bool addslash = true)
         {
-            if(dir == "//")
-            {
+            if (dir == "//") {
                 return dir;
             }
-            if (dir.StartsWith("/"))
+            if(dir == "./" || dir == "." || dir == "~" || dir=="cdir")
+            {
+                return di;
+            }
+            if (!dir.StartsWith("//") && dir.StartsWith("/"))
             {
                 dir = "/" + dir;
             }
@@ -33,11 +36,69 @@ namespace SunlightOS
             {
                 dir = di + dir;
             }
-            if (!dir.EndsWith("/"))
+            if (!dir.EndsWith("/") && addslash)
             {
                 dir = dir + "/";
             }
             return dir;
+        }
+        public static void sle(string[] code,string di,string key,string[] cmda)
+        {
+            var fs = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("data/fs.sl"));
+            var data = JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText("data/data.sl"));
+            var dirs = JsonSerializer.Deserialize<string[]>(File.ReadAllText("data/dirs.sl"));
+            Dictionary<string, string> vr = new Dictionary<string, string>();
+            int cnt = 0;
+            vr["*"] = "";
+            foreach (string arg in cmda)
+            {
+                vr[Convert.ToString(cnt)] = arg;
+                if (cnt != 0)
+                {
+                    if (cnt != 1)
+                    {
+                        vr["*"] += " ";
+                    }
+                    vr["*"] += arg;
+                }
+                cnt += 1;
+            }
+            foreach (string ln in code)
+            {
+                string line = ln;
+                foreach (string item in vr.Keys)
+                {
+                    line = line.Replace($"${item}", vr[item]);
+                }
+                Regex rx = new Regex(@"^[ \n\t+]*write:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
+                Regex cvr = new Regex(@"^[ \n\t+]*var:[ \n\t+]*(?<a>[^ \n\t]*)[ \n\t+]*=[ \n\t+]*(?<b>.*)$", RegexOptions.Compiled);
+                Regex inp = new Regex(@"^[ \n\t+]*input:[ \n\t+]*(?<a>[^ \n\t,]+)[ \n\t+]*,[ \n\t+]*(?<b>.*)$", RegexOptions.Compiled);
+                Regex rxn = new Regex(@"^[ \n\t+]*writen:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
+                if (rx.Matches(line).Count == 1)
+                {
+                    Console.WriteLine(rx.Matches(line)[0].Groups[1].ToString().Replace("\\s", " "));
+                }
+                else if (cvr.Matches(line).Count == 1)
+                {
+                    var dt = cvr.Matches(line)[0].Groups;
+                    vr[dt[1].ToString()] = dt[2].ToString().Replace(@"\s", " ");
+                }
+                else if (inp.Matches(line).Count == 1)
+                {
+                    var dt = inp.Matches(line)[0].Groups;
+                    Console.Write(dt[2].ToString().Replace(@"\s", " "));
+                    vr[dt[1].ToString()] = Console.ReadLine();
+                }
+                else if (rxn.Matches(line).Count == 1)
+                {
+                    Console.Write(rxn.Matches(line)[0].Groups[1].ToString().Replace(@"\s", " "));
+                }
+                else
+                {
+                    Console.WriteLine($"SunlightError: Invalid SLE command \"{line}\".");
+                    break;
+                }
+            }
         }
         static void Main(string[] args)
         {
@@ -99,6 +160,11 @@ namespace SunlightOS
                     Console.WriteLine($"CDError: No such dir: \"{cmda[1]}\".");
                 }
             }
+            else if(cmda[0] == "clear")
+            {
+                Console.Clear();
+                Console.WriteLine("SunlightOS [Version 0.0.1]");
+            }
             else if(cmda[0] == "mkdir")
             {
                 if (dirs.Contains(absdir(cmda[1], di)))
@@ -116,72 +182,45 @@ namespace SunlightOS
                     File.WriteAllText("data/dirs.sl", JsonSerializer.Serialize(dl));
                 }
             }
-            else if (fs.ContainsKey($"{di}{cmda[0]}.sle"))
+            else if(cmda[0] == "writef")
             {
-                Dictionary<string, string> vr = new Dictionary<string, string>();
-                int cnt = 0;
-                foreach(string arg in cmda)
+                string fn = cmda[1];
+                string txt = "";
+                while (true)
                 {
-                    vr[Convert.ToString(cnt)] = arg;
-                    cnt += 1;
-                }
-                foreach (string ln in fs[$"{di}{cmda[0]}.sle"].Split(';')){
-                    string line = ln;
-                    foreach(string item in vr.Keys)
+                    Console.Write(">>> ");
+                    string t = Console.ReadLine();
+                    if (t != "writef.end")
                     {
-                        line = line.Replace($"${item}", vr[item]);
-                    }
-                    Regex rx = new Regex(@"^[ \n\t+]*write:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
-                    Regex cvr = new Regex(@"^[ \n\t+]*var:[ \n\t+]*(?<a>[^ \n\t]*)[ \n\t+]*=[ \n\t+]*(?<b>.*)$", RegexOptions.Compiled);
-                    if (rx.Matches(line).Count == 1)
-                    {
-                        Console.WriteLine(rx.Matches(line)[0].Groups[1]);
-                    }
-                    else if(cvr.Matches(line).Count == 1)
-                    {
-                        var dt = cvr.Matches(line)[0].Groups;
-                        vr[dt[1].ToString()] = dt[2].ToString();
+                        txt += t;
                     }
                     else
                     {
-                        Console.WriteLine($"SunlightError: Invalid SLE command \"{line}\".");
                         break;
                     }
                 }
+                fs[absdir(fn,di,false)] = txt;
+                File.WriteAllText("data/fs.sl", JsonSerializer.Serialize(fs));
+            }
+            else if(cmda[0] == "deletef")
+            {
+                if (fs.ContainsKey(absdir(cmda[1], di)))
+                {
+                    fs.Remove(absdir(cmda[1], di,false));
+                    File.WriteAllText("data/fs.sl", JsonSerializer.Serialize(fs));
+                }
+                else
+                {
+                    Console.WriteLine($"FileError: No such file \"{absdir(cmda[1], di, false)}\"");
+                }
+            }
+            else if (fs.ContainsKey($"{di}{cmda[0]}.sle"))
+            {
+                sle(fs[$"{di}{cmda[0]}.sle"].Split(";"), di, $"{di}{cmda[0]}.sle", cmda);
             }
             else if (fs.ContainsKey($"{data["path"][0]}{cmda[0]}.sle"))
             {
-                Dictionary<string, string> vr = new Dictionary<string, string>();
-                int cnt = 0;
-                foreach (string arg in cmda)
-                {
-                    vr[Convert.ToString(cnt)] = arg;
-                    cnt += 1;
-                }
-                foreach (string ln in fs[$"{data["path"][0]}{cmda[0]}.sle"].Split(';'))
-                {
-                    string line = ln;
-                    foreach (string item in vr.Keys)
-                    {
-                        line = line.Replace($"${item}", vr[item]);
-                    }
-                    Regex rx = new Regex(@"^[ \n\t+]*write:[ \n\t+]*(?<a>.*)$", RegexOptions.Compiled);
-                    Regex cvr = new Regex(@"^[ \n\t+]*var:[ \n\t+]*(?<a>[^ \n\t]*)[ \n\t+]*=[ \n\t+]*(?<b>.*)$", RegexOptions.Compiled);
-                    if (rx.Matches(line).Count == 1)
-                    {
-                        Console.WriteLine(rx.Matches(line)[0].Groups[1]);
-                    }
-                    else if (cvr.Matches(line).Count == 1)
-                    {
-                        var dt = cvr.Matches(line)[0].Groups;
-                        vr[dt[1].ToString()] = dt[2].ToString();
-                    }
-                    else
-                    {
-                        Console.WriteLine($"SunlightError: Invalid SLE command \"{line}\".");
-                        break;
-                    }
-                }
+                sle(fs[$"{data["path"][0]}{cmda[0]}.sle"].Split(";"), di, $"{data["path"][0]}{cmda[0]}.sle", cmda);
             }
             else if(cmda[0] == "var")
             {
